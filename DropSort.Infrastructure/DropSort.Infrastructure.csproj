@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <ItemGroup>
+      <ProjectReference Include="..\DropSort.Application\DropSort.Application.csproj" />
+      <ProjectReference Include="..\DropSort.Core\DropSort.Core.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="Persistence\Scripts\Init.sql">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Dapper" Version="2.1.66" />
+      <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.1" />
+      <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
+    </ItemGroup>
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>Infrastructure</RootNamespace>
+    </PropertyGroup>
+
+</Project>
