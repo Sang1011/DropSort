@@ -2,6 +2,7 @@ using Dapper;
 using DropSort.Core.Interfaces;
 using DropSort.Core.Models;
 using Infrastructure.Persistence.Sqlite;
+using Infrastructure.Persistence.Scripts.Strings;
 
 namespace Infrastructure.Persistence.Repositories;
 
@@ -19,17 +20,7 @@ public class KeywordRuleRepository : IKeywordRuleRepository
         using var conn = _factory.Create();
 
         var rows = conn.Query<KeywordRuleRow>(
-            """
-            SELECT
-                id,
-                keyword,
-                extensions,
-                target_folder,
-                priority,
-                enabled
-            FROM keyword_rules
-            WHERE enabled = 1
-            """
+            KeywordRuleSql.GetEnabled
         );
 
         return rows.Select(r => new KeywordRule

@@ -3,6 +3,7 @@ using DropSort.Core.Enums;
 using DropSort.Core.Interfaces;
 using DropSort.Core.Models;
 using Infrastructure.Persistence.Sqlite;
+using Infrastructure.Persistence.Scripts.Strings;
 
 namespace Infrastructure.Persistence.Repositories;
 
@@ -23,24 +24,12 @@ public class FileTaskRepository : IFileTaskRepository
         if (string.IsNullOrWhiteSpace(task.FullPath))
             throw new ArgumentException("FileTask.FullPath is required");
 
-        const string sql = """
-                           INSERT INTO file_tasks (
-                               id, full_path, file_name, extension,
-                               size_in_bytes, source_drive,
-                               category, target_path,
-                               status, created_at
-                           )
-                           VALUES (
-                               @Id, @FullPath, @FileName, @Extension,
-                               @SizeInBytes, @SourceDrive,
-                               @Category, @TargetPath,
-                               @Status, @CreatedAt
-                           );
-                           """;
-
         using var conn = _connectionFactory.Create();
 
-        var affected = await conn.ExecuteAsync(sql, task);
+        var affected = await conn.ExecuteAsync(
+            FileTaskSql.Insert,
+            task
+        );
 
         if (affected != 1)
             throw new InvalidOperationException(
@@ -48,56 +37,37 @@ public class FileTaskRepository : IFileTaskRepository
             );
     }
 
-
     public async Task UpdateAsync(FileTask task)
     {
-        const string sql = """
-        UPDATE file_tasks
-        SET
-            status = @Status,
-            target_path = @TargetPath
-        WHERE id = @Id;
-        """;
-
         using var conn = _connectionFactory.Create();
-        await conn.ExecuteAsync(sql, task);
+        await conn.ExecuteAsync(FileTaskSql.Update, task);
     }
 
     public async Task<FileTask?> GetByPathAsync(string fullPath)
     {
-        const string sql = """
-        SELECT * FROM file_tasks
-        WHERE full_path = @fullPath
-        LIMIT 1;
-        """;
-
         using var conn = _connectionFactory.Create();
-        return await conn.QueryFirstOrDefaultAsync<FileTask>(sql, new { fullPath });
+        return await conn.QueryFirstOrDefaultAsync<FileTask>(
+            FileTaskSql.GetByPath,
+            new { fullPath }
+        );
     }
 
     public async Task<IReadOnlyList<FileTask>> GetPendingAsync()
     {
-        const string sql = """
-                           SELECT * FROM file_tasks
-                           WHERE status = @Pending OR status = @Processing;
-                           """;
-
         using var conn = _connectionFactory.Create();
-        return (await conn.QueryAsync<FileTask>(sql, new
-        {
-            Pending = FileTaskStatus.Pending,
-            Processing = FileTaskStatus.Processing
-        })).ToList();
+        return (await conn.QueryAsync<FileTask>(
+            FileTaskSql.GetPending,
+            new
+            {
+                Pending = FileTaskStatus.Pending,
+                Processing = FileTaskStatus.Processing
+            }
+        )).ToList();
     }
-    
+
     public async Task DeleteAsync(string id)
     {
-        const string sql = """
-                           DELETE FROM file_tasks
-                           WHERE id = @id;
-                           """;
-
         using var conn = _connectionFactory.Create();
-        await conn.ExecuteAsync(sql, new { id });
+        await conn.ExecuteAsync(FileTaskSql.DeleteById, new { id });
     }
 }
