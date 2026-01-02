@@ -4,5 +4,9 @@ namespace DropSort.Core.Interfaces;
 
 public interface ILogRepository
 {
-    void Write(LogEntry entry);
+    Task AddAsync(LogEntry entry);
+
+    Task<IReadOnlyList<LogEntry>> GetLatestAsync(int limit = 100);
+
+    Task DeleteAllAsync();
 }

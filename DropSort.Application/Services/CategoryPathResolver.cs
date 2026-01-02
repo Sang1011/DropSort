@@ -6,25 +6,18 @@ namespace Application.Services;
 public class CategoryPathResolver : ICategoryPathResolver
 {
     private readonly ISettingRepository _settings;
-    private readonly IFileClassifier _classifier;
 
-    public CategoryPathResolver(
-        ISettingRepository settings,
-        IFileClassifier classifier)
+    public CategoryPathResolver(ISettingRepository settings)
     {
         _settings = settings;
-        _classifier = classifier;
     }
 
-    public string ResolveTargetPath(FileItem file)
+    public string ResolveTargetPath(FileTask task)
     {
         var root = _settings.Get("download_root")
                    ?? throw new InvalidOperationException("download_root is not configured");
 
-        var category = _classifier.Classify(file.Extension, file.FileName);
-        file.Category = category;
-
-        var folderName = category.ToString();
-        return Path.Combine(root, folderName, file.FileName);
+        var folderName = task.Category.ToString();
+        return Path.Combine(root, folderName, task.FileName);
     }
 }

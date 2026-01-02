@@ -23,7 +23,8 @@ public static class DependencyInjection
         services.AddSingleton<ILogRepository, LogRepository>();
         services.AddSingleton<IWatchPathRepository, WatchPathRepository>();
         services.AddSingleton<IKeywordRuleRepository, KeywordRuleRepository>();
-
+        services.AddSingleton<IFileTaskRepository, FileTaskRepository>();
+        
         // ===== FILE SYSTEM =====
         services.AddSingleton<IFileMover, FileMover>();              
         services.AddSingleton<IDuplicateResolver, DuplicateResolver>();
@@ -96,9 +97,6 @@ public static class DependencyInjection
 
             return new MultiFileWatcherService(watchers);
         });
-
-
-
         return services;
     }
 }

@@ -4,5 +4,5 @@ namespace DropSort.Core.Interfaces;
 
 public interface IFileMover
 {
-    Task MoveAsync(FileItem file, string targetPath, CancellationToken ct);
+    Task MoveAsync(FileTask task, string targetPath, CancellationToken ct);
 }

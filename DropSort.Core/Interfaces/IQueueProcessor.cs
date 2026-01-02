@@ -4,6 +4,6 @@ namespace DropSort.Core.Interfaces;
 
 public interface IQueueProcessor
 {
-    void EnqueueHigh(FileItem file);
-    void EnqueueLow(FileItem file);
+    void EnqueueHigh(FileTask task);
+    void EnqueueLow(FileTask task);
 }

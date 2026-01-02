@@ -1,3 +1,4 @@
+using DropSort.Core.Enums;
 using DropSort.Core.Interfaces;
 using DropSort.Core.Models;
 using Microsoft.Extensions.Logging;
@@ -6,54 +7,59 @@ namespace Application.Services;
 
 public class QueueDecisionService
 {
-    private const long LargeFileThresholdBytes = 200 * 1024 * 1024; 
+    private const long LargeFileThresholdBytes = 200 * 1024 * 1024;
 
     private readonly IQueueProcessor _queue;
     private readonly ISettingRepository _settings;
+    private readonly IFileTaskRepository _taskRepo;
     private readonly ILogger<QueueDecisionService> _logger;
 
     public QueueDecisionService(
         IQueueProcessor queue,
         ISettingRepository settings,
+        IFileTaskRepository taskRepo,
         ILogger<QueueDecisionService> logger)
     {
         _queue = queue;
         _settings = settings;
+        _taskRepo = taskRepo;
         _logger = logger;
     }
 
-    public void Decide(FileItem file)
+    public async Task DecideAsync(FileItem file)
     {
+        var existing = await _taskRepo.GetByPathAsync(file.FullPath);
+        if (existing?.Status == FileTaskStatus.Moved)
+            return;
+
         var targetRoot = _settings.Get("download_root");
         if (string.IsNullOrWhiteSpace(targetRoot))
-        {
-            _logger.LogWarning(
-                "No download_root configured, skipping {file}",
-                file.FileName);
             return;
-        }
 
         var targetDrive = Path.GetPathRoot(targetRoot);
+        var sameDrive = string.Equals(
+            file.SourceDrive,
+            targetDrive,
+            StringComparison.OrdinalIgnoreCase);
 
-        var sameDrive =
-            string.Equals(file.SourceDrive, targetDrive,
-                StringComparison.OrdinalIgnoreCase);
-
-        if (sameDrive)
+        var task = new FileTask
         {
-            _queue.EnqueueHigh(file);
-            return;
-        }
+            Id = Guid.NewGuid(),
+            FullPath = file.FullPath,
+            FileName = file.FileName,
+            Extension = file.Extension,
+            SizeInBytes = file.SizeInBytes,
+            SourceDrive = file.SourceDrive,
+            Category = file.Category,
+            CreatedAt = DateTime.UtcNow,
+            Status = FileTaskStatus.Pending
+        };
 
-        // khác ổ
-        if (file.SizeInBytes >= LargeFileThresholdBytes)
-        {
-            _queue.EnqueueLow(file);
-            // bước sau sẽ notify
-        }
+        await _taskRepo.AddAsync(task);
+
+        if (sameDrive || file.SizeInBytes < LargeFileThresholdBytes)
+            _queue.EnqueueHigh(task);
         else
-        {
-            _queue.EnqueueHigh(file);
-        }
+            _queue.EnqueueLow(task);
     }
 }

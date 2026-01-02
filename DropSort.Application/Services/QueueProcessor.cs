@@ -18,17 +18,17 @@ public class QueueProcessor : IQueueProcessor
         _logger = logger;
     }
 
-    public void EnqueueHigh(FileItem file)
-    {
-        _queues.High.Enqueue(file);
-        _logger.LogInformation(
-            "[QUEUE:HIGH] {file}", file.FileName);
-    }
+        public void EnqueueHigh(FileTask task)
+        {
+            _queues.High.Enqueue(task);
+            _logger.LogInformation(
+                "[QUEUE:HIGH] {file}", task.FileName);
+        }
 
-    public void EnqueueLow(FileItem file)
-    {
-        _queues.Low.Enqueue(file);
-        _logger.LogInformation(
-            "[QUEUE:LOW] {file}", file.FileName);
-    }
+        public void EnqueueLow(FileTask task)
+        {
+            _queues.Low.Enqueue(task);
+            _logger.LogInformation(
+                "[QUEUE:LOW] {file}", task.FileName);
+        }
 }

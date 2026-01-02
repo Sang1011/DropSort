@@ -16,7 +16,7 @@ public class FileMover : IFileMover
         _duplicate = duplicate;
     }
 
-    public async Task MoveAsync(FileItem file, string targetPath, CancellationToken ct)
+    public async Task MoveAsync(FileTask task, string targetPath, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -33,8 +33,12 @@ public class FileMover : IFileMover
         {
             try
             {
-                File.Move(file.FullPath, finalPath);
-                file.FullPath = finalPath;
+                File.Move(task.FullPath, finalPath);
+
+                // update snapshot
+                task.FullPath = finalPath;
+                task.TargetPath = finalPath;
+
                 return;
             }
             catch (IOException)

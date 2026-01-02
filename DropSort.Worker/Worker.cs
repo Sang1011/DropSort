@@ -1,3 +1,4 @@
+using Application.Queues;
 using Application.Services;
 using DropSort.Core.Interfaces;
 using DropSort.Core.Models;
@@ -12,19 +13,28 @@ public class Worker : BackgroundService
     private readonly ISettingRepository _settingRepo;
     private readonly IFileWatcher _fileWatcher;
     private readonly QueueDecisionService _decisionService;
+    private readonly IFileTaskRepository _taskRepo;
+    private readonly InMemoryQueues _queues;
+    private readonly QueueProcessingService _queueProcessor;
 
     public Worker(
         ILogger<Worker> logger,
         DatabaseInitializer dbInitializer,
         ISettingRepository settingRepo,
         IFileWatcher fileWatcher,
-        QueueDecisionService decisionService)
+        QueueDecisionService decisionService,
+        IFileTaskRepository taskRepo,
+        InMemoryQueues queues,
+        QueueProcessingService queueProcessor)
     {
         _logger = logger;
         _dbInitializer = dbInitializer;
         _settingRepo = settingRepo;
         _fileWatcher = fileWatcher;
         _decisionService = decisionService;
+        _taskRepo = taskRepo;
+        _queues = queues;
+        _queueProcessor = queueProcessor;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -34,18 +44,19 @@ public class Worker : BackgroundService
         // ===== INIT DB =====
         _dbInitializer.Initialize();
         _logger.LogInformation("Database initialized");
-        
+
+        // ===== RESUME PENDING TASKS =====
+        _logger.LogInformation("Resuming pending tasks...");
+
+        var pendingTasks = await _taskRepo.GetPendingAsync();
+        foreach (var task in pendingTasks)
+            _queues.High.Enqueue(task);
+
+        _logger.LogInformation("Resumed {count} pending tasks", pendingTasks.Count);
+
         var root = _settingRepo.Get("download_root");
         if (string.IsNullOrWhiteSpace(root))
-        {
-            throw new InvalidOperationException(
-                "download_root is not configured. Please configure it before starting Worker.");
-        }
-
-        // ===== TEST SETTINGS =====
-        _settingRepo.Set("worker_started_at", DateTime.UtcNow.ToString("O"));
-        var value = _settingRepo.Get("worker_started_at");
-        _logger.LogInformation("Setting test value = {value}", value);
+            throw new InvalidOperationException("download_root is not configured.");
 
         // ===== FILE WATCHER =====
         _fileWatcher.FileReady += OnFileReady;
@@ -57,9 +68,19 @@ public class Worker : BackgroundService
             _fileWatcher.Stop();
         });
 
-        // ===== GIỮ WORKER SỐNG =====
+        // ===== QUEUE PROCESS LOOP (CÁI BẠN THIẾU) =====
+        _ = Task.Run(async () =>
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await _queueProcessor.ProcessOnceAsync(stoppingToken);
+                await Task.Delay(200, stoppingToken);
+            }
+        }, stoppingToken);
+
         await Task.Delay(Timeout.Infinite, stoppingToken);
     }
+
 
     private void OnFileReady(FileItem file)
     {
@@ -74,6 +95,6 @@ public class Worker : BackgroundService
             file.FileName
         );
 
-        _decisionService.Decide(file);
+        _decisionService.DecideAsync(file);
     }
 }

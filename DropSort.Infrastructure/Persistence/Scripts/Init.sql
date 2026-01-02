@@ -27,3 +27,20 @@ CREATE TABLE IF NOT EXISTS keyword_rules (
                                              priority INTEGER NOT NULL DEFAULT 0,
                                              enabled INTEGER NOT NULL DEFAULT 1
 );
+
+CREATE TABLE IF NOT EXISTS file_tasks (
+                                          id TEXT PRIMARY KEY,                  -- Guid
+                                          full_path TEXT NOT NULL,
+                                          file_name TEXT NOT NULL,
+                                          extension TEXT NOT NULL,
+                                          size_in_bytes INTEGER NOT NULL,
+                                          source_drive TEXT NOT NULL,
+
+                                          category INTEGER NOT NULL,             -- enum FileCategory
+                                          target_path TEXT NOT NULL,
+
+                                          status INTEGER NOT NULL,               -- enum FileTaskStatus
+
+                                          created_at TEXT NOT NULL,
+                                          completed_at TEXT
+);
