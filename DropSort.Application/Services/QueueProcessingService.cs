@@ -84,6 +84,7 @@ public class QueueProcessingService
             );
 
             await _repo.DeleteAsync(task.Id);
+            await LogRemainingTasksAsync();
             return;
         }
 

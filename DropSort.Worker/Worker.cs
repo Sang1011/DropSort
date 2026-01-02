@@ -79,7 +79,7 @@ public class Worker : BackgroundService
         }
 
         // ===== FILE WATCHER =====
-        _fileWatcher.FileReady += OnFileReady;
+        _fileWatcher.FileReady += file => _ = OnFileReady(file);
         _fileWatcher.Start();
 
         stoppingToken.Register(() =>
@@ -104,7 +104,7 @@ public class Worker : BackgroundService
 
 
 
-    private async void OnFileReady(FileItem file)
+    private async Task OnFileReady(FileItem file)
     {
         try
         {
