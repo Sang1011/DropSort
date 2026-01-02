@@ -3,22 +3,28 @@ using DropSort.Core.Interfaces;
 using DropSort.Core.Models;
 
 namespace Application.Services;
+using Microsoft.Extensions.Logging;
+
 
 public class FolderResolver : IFolderResolver
 {
     private readonly ISettingRepository _settings;
     private readonly IFileClassifier _classifier;
     private readonly IKeywordRuleMatcher _keywordRuleMatcher;
+    private readonly ILogger<FolderResolver> _logger;
 
     public FolderResolver(
         ISettingRepository settings,
         IFileClassifier classifier,
-        IKeywordRuleMatcher keywordRuleMatcher)
+        IKeywordRuleMatcher keywordRuleMatcher,
+        ILogger<FolderResolver> logger)
     {
         _settings = settings;
         _classifier = classifier;
         _keywordRuleMatcher = keywordRuleMatcher;
+        _logger = logger;
     }
+
 
     public string ResolveTargetPath(FileItem file)
     {
@@ -26,20 +32,41 @@ public class FolderResolver : IFolderResolver
         if (string.IsNullOrWhiteSpace(root))
             throw new InvalidOperationException("download_root is not configured");
 
-        // ===== 1. KEYWORD OVERRIDE (PRIORITY CAO NHẤT) =====
+        // ===== KEYWORD RULE OVERRIDE =====
         var keywordFolder = _keywordRuleMatcher.TryResolve(file);
         if (keywordFolder != null)
         {
-            return Path.Combine(root, keywordFolder, file.FileName);
+            var keywordPath = Path.Combine(root, keywordFolder, file.FileName);
+
+            _logger.LogInformation(
+                "Resolved target path by keyword rule for file {file}: {path}",
+                file.FileName,
+                keywordPath
+            );
+
+            return keywordPath;
         }
 
-        // ===== 2. CATEGORY =====
-        var category = _classifier.Classify(file.Extension, file.FileName);
+        // ===== NORMALIZE EXTENSION =====
+        var ext = file.Extension;
+
+        if (!string.IsNullOrWhiteSpace(ext) && !ext.StartsWith("."))
+        {
+            ext = "." + ext;
+        }
+
+        _logger.LogDebug(
+            "Resolving folder for file {file}, extension={ext}",
+            file.FileName,
+            ext
+        );
+
+        // ===== CLASSIFY =====
+        var category = _classifier.Classify(ext, file.FileName);
         file.Category = category;
 
         var categoryDir = Path.Combine(root, category.ToString());
 
-        // ===== 3. GROUP BY EXTENSION (OPTIONAL) =====
         var groupByExt =
             string.Equals(
                 _settings.Get("group_by_extension"),
@@ -47,13 +74,27 @@ public class FolderResolver : IFolderResolver
                 StringComparison.OrdinalIgnoreCase
             );
 
+        // ===== FINAL TARGET PATH =====
+        string targetPath;
+
         if (!groupByExt)
         {
-            return Path.Combine(categoryDir, file.FileName);
+            targetPath = Path.Combine(categoryDir, file.FileName);
+        }
+        else
+        {
+            var extFolder = ext.TrimStart('.').ToUpperInvariant();
+            targetPath = Path.Combine(categoryDir, extFolder, file.FileName);
         }
 
-        var ext = file.Extension.TrimStart('.').ToUpperInvariant();
-        return Path.Combine(categoryDir, ext, file.FileName);
+        _logger.LogInformation(
+            "Resolved target path for file {file}: {path}",
+            file.FileName,
+            targetPath
+        );
+
+        return targetPath;
     }
+
 
 }

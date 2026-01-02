@@ -4,7 +4,7 @@ namespace DropSort.Core.Models;
 
 public class FileTask
 {
-    public Guid Id { get; set; }
+    public string Id { get; set; } = Guid.NewGuid().ToString();
     public string FullPath { get; set; } = string.Empty;
     public string FileName { get; set; } = string.Empty;
     public string Extension { get; set; } = string.Empty;

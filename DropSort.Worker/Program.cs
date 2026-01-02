@@ -29,14 +29,9 @@ var dbPath = Path.Combine(AppContext.BaseDirectory, "dropsort.db");
         settings.Set("download_root", @"D:\SortedDownloads");
         Console.WriteLine("Seeded download_root = D:\\SortedDownloads");
     }
-    if (string.IsNullOrWhiteSpace(settings.Get("watch_root")))
-    {
-        settings.Set("watch_root", @"D:\MyDownloads");
-        Console.WriteLine("Watch root = D:\\MyDownloads");
-    }
 }
 
-// ===== DI CHÍNH =====
+// ===== DI =====
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(dbPath);
 
@@ -45,4 +40,34 @@ builder.Services.AddHostedService<Worker>();
 builder.Services.AddHostedService<QueueHostedService>();
 
 var host = builder.Build();
+var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
+lifetime.ApplicationStopping.Register(() =>
+{
+    try
+    {
+        using var scope = host.Services.CreateScope();
+        var logRepo = scope.ServiceProvider.GetRequiredService<ILogRepository>();
+
+        var logs = logRepo.GetLatestAsync(500).GetAwaiter().GetResult();
+
+        var logDir = Path.Combine(AppContext.BaseDirectory, "logs");
+        Directory.CreateDirectory(logDir);
+
+        var filePath = Path.Combine(
+            logDir,
+            $"dropsort-last-session-{DateTime.UtcNow:yyyyMMdd-HHmmss}.txt"
+        );
+
+        File.WriteAllLines(
+            filePath,
+            logs.Select(l =>
+                $"[{l.CreatedAt:yyyy-MM-dd HH:mm:ss}] [{l.Level}] {l.Message} {l.FileName}"
+            )
+        );
+    }
+    catch
+    {
+    }
+});
+
 host.Run();

@@ -12,18 +12,18 @@ public class QueueDecisionService
     private readonly IQueueProcessor _queue;
     private readonly ISettingRepository _settings;
     private readonly IFileTaskRepository _taskRepo;
-    private readonly ILogger<QueueDecisionService> _logger;
+    private readonly IFolderResolver _folderResolver;
 
     public QueueDecisionService(
         IQueueProcessor queue,
         ISettingRepository settings,
         IFileTaskRepository taskRepo,
-        ILogger<QueueDecisionService> logger)
+        IFolderResolver folderResolver)
     {
         _queue = queue;
         _settings = settings;
         _taskRepo = taskRepo;
-        _logger = logger;
+        _folderResolver = folderResolver;
     }
 
     public async Task DecideAsync(FileItem file)
@@ -41,16 +41,17 @@ public class QueueDecisionService
             file.SourceDrive,
             targetDrive,
             StringComparison.OrdinalIgnoreCase);
-
+        var targetPath = _folderResolver.ResolveTargetPath(file);
         var task = new FileTask
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.NewGuid().ToString(),
             FullPath = file.FullPath,
             FileName = file.FileName,
             Extension = file.Extension,
             SizeInBytes = file.SizeInBytes,
             SourceDrive = file.SourceDrive,
             Category = file.Category,
+            TargetPath = targetPath,
             CreatedAt = DateTime.UtcNow,
             Status = FileTaskStatus.Pending
         };

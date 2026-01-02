@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using DropSort.Core.Interfaces;
 using Application.Services;
 using Application.Queues;
+using Application.Services.Logging;
 
 namespace Application;
 
@@ -19,7 +20,7 @@ public static class DependencyInjection
         services.AddSingleton<IFolderResolver, FolderResolver>();
         services.AddSingleton<ICategoryPathResolver, CategoryPathResolver>();
         services.AddSingleton<IKeywordRuleMatcher, KeywordRuleMatcher>();
-
+        services.AddSingleton<ILogService, LogService>();
         return services;
     }
 }

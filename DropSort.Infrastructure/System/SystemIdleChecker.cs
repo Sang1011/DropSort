@@ -38,8 +38,6 @@ public class SystemIdleChecker : ISystemIdleChecker, IDisposable
 
     public bool IsIdle()
     {
-        Thread.Sleep(200);
-
         var cpu = _cpuCounter.NextValue();
         var disk = _diskCounter.NextValue();
 
@@ -60,6 +58,7 @@ public class SystemIdleChecker : ISystemIdleChecker, IDisposable
         var stableSeconds = GetStableSeconds();
         return now - _idleSince >= TimeSpan.FromSeconds(stableSeconds);
     }
+
 
     private int GetStableSeconds()
     {

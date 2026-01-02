@@ -29,16 +29,16 @@ public static class DependencyInjection
         services.AddSingleton<IFileMover, FileMover>();              
         services.AddSingleton<IDuplicateResolver, DuplicateResolver>();
         services.AddSingleton<ISystemIdleChecker, SystemIdleChecker>();
+        services.AddSingleton<IDiskSpaceChecker, DiskSpaceChecker>();
 
         // ===== FILE WATCHER =====
-        // ===== FILE WATCHER (MULTI PATH) =====
         services.AddSingleton<IFileWatcher>(sp =>
         {
             var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
             var settings      = sp.GetRequiredService<ISettingRepository>();
             var watchRepo     = sp.GetRequiredService<IWatchPathRepository>();
 
-            // ===== TARGET ROOT (BẮT BUỘC) =====
+            // ===== TARGET ROOT =====
             var targetRoot = settings.Get("download_root");
             if (string.IsNullOrWhiteSpace(targetRoot))
                 throw new InvalidOperationException("download_root is required");

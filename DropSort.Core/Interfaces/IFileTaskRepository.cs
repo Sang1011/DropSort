@@ -10,5 +10,5 @@ public interface IFileTaskRepository
     Task<FileTask?> GetByPathAsync(string fullPath);
     Task<IReadOnlyList<FileTask>> GetPendingAsync();
 
-    Task DeleteAsync(Guid id);
+    Task DeleteAsync(string id);
 }

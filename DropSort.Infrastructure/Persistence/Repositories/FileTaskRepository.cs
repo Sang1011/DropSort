@@ -17,24 +17,37 @@ public class FileTaskRepository : IFileTaskRepository
 
     public async Task AddAsync(FileTask task)
     {
+        if (string.IsNullOrWhiteSpace(task.Id))
+            throw new ArgumentException("FileTask.Id is required");
+
+        if (string.IsNullOrWhiteSpace(task.FullPath))
+            throw new ArgumentException("FileTask.FullPath is required");
+
         const string sql = """
-        INSERT INTO file_tasks (
-            id, full_path, file_name, extension,
-            size_in_bytes, source_drive,
-            category, target_path,
-            status, created_at
-        )
-        VALUES (
-            @Id, @FullPath, @FileName, @Extension,
-            @SizeInBytes, @SourceDrive,
-            @Category, @TargetPath,
-            @Status, @CreatedAt
-        );
-        """;
+                           INSERT INTO file_tasks (
+                               id, full_path, file_name, extension,
+                               size_in_bytes, source_drive,
+                               category, target_path,
+                               status, created_at
+                           )
+                           VALUES (
+                               @Id, @FullPath, @FileName, @Extension,
+                               @SizeInBytes, @SourceDrive,
+                               @Category, @TargetPath,
+                               @Status, @CreatedAt
+                           );
+                           """;
 
         using var conn = _connectionFactory.Create();
-        await conn.ExecuteAsync(sql, task);
+
+        var affected = await conn.ExecuteAsync(sql, task);
+
+        if (affected != 1)
+            throw new InvalidOperationException(
+                $"Insert FileTask failed (affected rows = {affected})"
+            );
     }
+
 
     public async Task UpdateAsync(FileTask task)
     {
@@ -42,8 +55,7 @@ public class FileTaskRepository : IFileTaskRepository
         UPDATE file_tasks
         SET
             status = @Status,
-            target_path = @TargetPath,
-            completed_at = @CompletedAt
+            target_path = @TargetPath
         WHERE id = @Id;
         """;
 
@@ -66,9 +78,9 @@ public class FileTaskRepository : IFileTaskRepository
     public async Task<IReadOnlyList<FileTask>> GetPendingAsync()
     {
         const string sql = """
-        SELECT * FROM file_tasks
-        WHERE status IN (@Pending, @Processing);
-        """;
+                           SELECT * FROM file_tasks
+                           WHERE status = @Pending OR status = @Processing;
+                           """;
 
         using var conn = _connectionFactory.Create();
         return (await conn.QueryAsync<FileTask>(sql, new
@@ -78,7 +90,7 @@ public class FileTaskRepository : IFileTaskRepository
         })).ToList();
     }
     
-    public async Task DeleteAsync(Guid id)
+    public async Task DeleteAsync(string id)
     {
         const string sql = """
                            DELETE FROM file_tasks

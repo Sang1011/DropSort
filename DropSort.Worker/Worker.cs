@@ -1,5 +1,6 @@
 using Application.Queues;
 using Application.Services;
+using DropSort.Core.Enums;
 using DropSort.Core.Interfaces;
 using DropSort.Core.Models;
 using Infrastructure.Persistence.Sqlite;
@@ -16,6 +17,7 @@ public class Worker : BackgroundService
     private readonly IFileTaskRepository _taskRepo;
     private readonly InMemoryQueues _queues;
     private readonly QueueProcessingService _queueProcessor;
+    private readonly ILogService _log;
 
     public Worker(
         ILogger<Worker> logger,
@@ -25,7 +27,8 @@ public class Worker : BackgroundService
         QueueDecisionService decisionService,
         IFileTaskRepository taskRepo,
         InMemoryQueues queues,
-        QueueProcessingService queueProcessor)
+        QueueProcessingService queueProcessor,
+        ILogService log)
     {
         _logger = logger;
         _dbInitializer = dbInitializer;
@@ -35,6 +38,7 @@ public class Worker : BackgroundService
         _taskRepo = taskRepo;
         _queues = queues;
         _queueProcessor = queueProcessor;
+        _log = log;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -48,15 +52,31 @@ public class Worker : BackgroundService
         // ===== RESUME PENDING TASKS =====
         _logger.LogInformation("Resuming pending tasks...");
 
-        var pendingTasks = await _taskRepo.GetPendingAsync();
-        foreach (var task in pendingTasks)
-            _queues.High.Enqueue(task);
+        try
+        {
+            var pendingTasks = await _taskRepo.GetPendingAsync();
 
-        _logger.LogInformation("Resumed {count} pending tasks", pendingTasks.Count);
+            foreach (var task in pendingTasks)
+                _queues.High.Enqueue(task);
 
-        var root = _settingRepo.Get("download_root");
-        if (string.IsNullOrWhiteSpace(root))
-            throw new InvalidOperationException("download_root is not configured.");
+            _logger.LogInformation(
+                "Resumed {count} pending tasks",
+                pendingTasks.Count
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to resume pending tasks. DropSort will continue without resuming."
+            );
+
+            await _log.ErrorAsync(
+                LogEvent.Failed,
+                ex,
+                "resume_pending_tasks"
+            );
+        }
 
         // ===== FILE WATCHER =====
         _fileWatcher.FileReady += OnFileReady;
@@ -68,7 +88,7 @@ public class Worker : BackgroundService
             _fileWatcher.Stop();
         });
 
-        // ===== QUEUE PROCESS LOOP (CÁI BẠN THIẾU) =====
+        // ===== QUEUE PROCESS LOOP =====
         _ = Task.Run(async () =>
         {
             while (!stoppingToken.IsCancellationRequested)
@@ -78,23 +98,34 @@ public class Worker : BackgroundService
             }
         }, stoppingToken);
 
+        // ===== KEEP WORKER ALIVE =====
         await Task.Delay(Timeout.Infinite, stoppingToken);
     }
 
 
-    private void OnFileReady(FileItem file)
+
+    private async void OnFileReady(FileItem file)
     {
-        _logger.LogInformation(
-            "Detected downloaded file: {file} ({size} bytes)",
+        try
+        {
+        await _log.InfoAsync(
+            LogEvent.FileDetected,
+            file.FileName,
+            file.FullPath
+        );
+
+        _logger.LogDebug(
+            "FileReady event: {file}, size={size}",
             file.FileName,
             file.SizeInBytes
         );
 
-        _logger.LogInformation(
-            "File ready → decision: {file}",
-            file.FileName
-        );
-
-        _decisionService.DecideAsync(file);
+        await _decisionService.DecideAsync(file);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling FileReady for {file}", file.FileName);
+        }
     }
+
 }
