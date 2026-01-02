@@ -24,9 +24,9 @@ public static class DependencyInjection
         services.AddSingleton<IWatchPathRepository, WatchPathRepository>();
         services.AddSingleton<IKeywordRuleRepository, KeywordRuleRepository>();
         services.AddSingleton<IFileTaskRepository, FileTaskRepository>();
-        
+
         // ===== FILE SYSTEM =====
-        services.AddSingleton<IFileMover, FileMover>();              
+        services.AddSingleton<IFileMover, FileMover>();
         services.AddSingleton<IDuplicateResolver, DuplicateResolver>();
         services.AddSingleton<ISystemIdleChecker, SystemIdleChecker>();
         services.AddSingleton<IDiskSpaceChecker, DiskSpaceChecker>();
@@ -35,18 +35,15 @@ public static class DependencyInjection
         services.AddSingleton<IFileWatcher>(sp =>
         {
             var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-            var settings      = sp.GetRequiredService<ISettingRepository>();
-            var watchRepo     = sp.GetRequiredService<IWatchPathRepository>();
+            var settings = sp.GetRequiredService<ISettingRepository>();
+            var watchRepo = sp.GetRequiredService<IWatchPathRepository>();
 
             // ===== TARGET ROOT =====
             var targetRoot = settings.Get("download_root");
             if (string.IsNullOrWhiteSpace(targetRoot))
                 throw new InvalidOperationException("download_root is required");
 
-            if (!Directory.Exists(targetRoot))
-            {
-                Directory.CreateDirectory(targetRoot);
-            }
+            Directory.CreateDirectory(targetRoot);
 
             // ===== WATCH PATHS =====
             var watchPaths = watchRepo.GetEnabledPaths();
@@ -68,14 +65,15 @@ public static class DependencyInjection
                 );
             }
 
+            var distinctPaths = watchPaths
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
             var watchers = new List<IFileWatcher>();
 
-            foreach (var path in watchPaths.Distinct(StringComparer.OrdinalIgnoreCase))
+            foreach (var path in distinctPaths)
             {
-                if (!Directory.Exists(path))
-                {
-                    Directory.CreateDirectory(path);
-                }
+                Directory.CreateDirectory(path);
 
                 if (string.Equals(
                         Path.GetFullPath(path),
@@ -95,8 +93,15 @@ public static class DependencyInjection
                 ));
             }
 
+            // ===== 🔥 OPTIMIZATION POINT =====
+            if (watchers.Count == 1)
+            {
+                return watchers[0];
+            }
+
             return new MultiFileWatcherService(watchers);
         });
+
         return services;
     }
 }
